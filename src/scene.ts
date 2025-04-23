@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GUI } from 'lil-gui';
 import Stats from 'stats.js';
 import { BokehShader, BokehDepthShader } from 'three/examples/jsm/shaders/BokehShader2.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 export function initScene() {
   const container = document.getElementById('app');
@@ -22,6 +23,10 @@ export function initScene() {
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   container.appendChild(renderer.domElement);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 20, -50); // Set the initial focus point
+  controls.update();
 
   // Stats
   const stats = new Stats();
@@ -195,8 +200,8 @@ export function initScene() {
     stats.update();
     requestAnimationFrame(animate);
   
-    animateCamera();
-
+    // animateCamera();
+    controls.update();
     render();
   }
 
