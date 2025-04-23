@@ -40,7 +40,7 @@ export function initScene() {
     const intersects = raycaster.intersectObjects(scene.children, true);
 
     if (intersects.length > 0) {
-      const distance = intersects[0].distance;
+      const distance = intersects[0].distance; 
       postprocessing.bokeh_uniforms['focalDepth'].value = distance;
     }
   });
