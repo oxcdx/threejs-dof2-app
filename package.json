@@ -9,12 +9,14 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/pako": "^2.0.3",
     "@types/three": "^0.175.0",
     "typescript": "~5.7.2",
     "vite": "^6.3.2"
   },
   "dependencies": {
     "lil-gui": "^0.20.0",
+    "pako": "^2.1.0",
     "stats.js": "^0.17.0",
     "three": "^0.176.0"
   }

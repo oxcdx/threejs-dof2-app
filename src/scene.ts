@@ -3,6 +3,7 @@ import { GUI } from 'lil-gui';
 import Stats from 'stats.js';
 import { BokehShader, BokehDepthShader } from 'three/examples/jsm/shaders/BokehShader2.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { createAIImagesPoints, createAIImagesPlane, createAIImagesPlaneFakePoints } from './geometryHelper'; // Update with the correct path
 
 export function initScene() {
   const container = document.getElementById('app');
@@ -70,11 +71,11 @@ export function initScene() {
   const gui = new GUI();
   const effectController = {
     enabled: true,
-    jsDepthCalculation: true,
+    jsDepthCalculation: false,
     shaderFocus: false,
     focalDepth: 2.8,
-    fstop: 2.2,
-    maxblur: 1.0,
+    fstop: 1.4,
+    maxblur: 5,
     showFocus: false,
     manualdof: false,
     vignetting: false,
@@ -87,6 +88,11 @@ export function initScene() {
     noise: true,
     pentagon: false,
     dithering: 0.0001,
+    showSkybox: true,
+    cellSize: 5.0,
+    pointSize: 1.0,
+    showPointCloud: true,
+    showPlane: true
   };
 
   
@@ -113,77 +119,157 @@ export function initScene() {
   };
 
   gui.add(effectController, 'enabled').onChange(matChanger);
-  gui.add(effectController, 'jsDepthCalculation').onChange(matChanger);
-  gui.add(effectController, 'shaderFocus').onChange(matChanger);
+  // gui.add(effectController, 'jsDepthCalculation').onChange(matChanger);
+  // gui.add(effectController, 'shaderFocus').onChange(matChanger);
   gui.add(effectController, 'focalDepth', 0.0, 200.0).listen().onChange(matChanger);
   gui.add(effectController, 'fstop', 0.1, 22, 0.001).onChange(matChanger);
-  gui.add(effectController, 'maxblur', 0.0, 5.0, 0.025).onChange(matChanger);
+  gui.add(effectController, 'maxblur', 0.0, 20.0, 0.025).onChange(matChanger);
   gui.add(effectController, 'showFocus').onChange(matChanger);
   gui.add(effectController, 'manualdof').onChange(matChanger);
-  gui.add(effectController, 'vignetting').onChange(matChanger);
-  gui.add(effectController, 'depthblur').onChange(matChanger);
+  // gui.add(effectController, 'vignetting').onChange(matChanger);
+  // gui.add(effectController, 'depthblur').onChange(matChanger);
   gui.add(effectController, 'threshold', 0, 1, 0.001).onChange(matChanger);
   gui.add(effectController, 'gain', 0, 100, 0.001).onChange(matChanger);
   gui.add(effectController, 'bias', 0, 3, 0.001).onChange(matChanger);
-  gui.add(effectController, 'fringe', 0, 5, 0.001).onChange(matChanger);
-  gui.add(effectController, 'focalLength', 16, 80, 0.001).onChange(matChanger);
-  gui.add(effectController, 'noise').onChange(matChanger);
-  gui.add(effectController, 'dithering', 0, 0.001, 0.0001).onChange(matChanger);
-  gui.add(effectController, 'pentagon').onChange(matChanger);
-  gui.add(shaderSettings, 'rings', 1, 8).step(1).onChange(() => {
+  // gui.add(effectController, 'fringe', 0, 5, 0.001).onChange(matChanger);
+  // gui.add(effectController, 'focalLength', 16, 80, 0.001).onChange(matChanger);
+  // gui.add(effectController, 'noise').onChange(matChanger);
+  // gui.add(effectController, 'dithering', 0, 0.001, 0.0001).onChange(matChanger);
+  // gui.add(effectController, 'pentagon').onChange(matChanger);
+  const qualityFolder = gui.addFolder('Quality');
+  qualityFolder.add(shaderSettings, 'rings', 1, 8).step(1).onChange(() => {
     postprocessing.materialBokeh.defines.RINGS = shaderSettings.rings;
     postprocessing.materialBokeh.needsUpdate = true;
   });
-  gui.add(shaderSettings, 'samples', 1, 13).step(1).onChange(() => {
+  qualityFolder.add(shaderSettings, 'samples', 1, 13).step(1).onChange(() => {
     postprocessing.materialBokeh.defines.SAMPLES = shaderSettings.samples;
     postprocessing.materialBokeh.needsUpdate = true;
   });
+  qualityFolder.close(); // Close this folder by default
+  const environmentFolder = gui.addFolder('Environment');
+  environmentFolder.add(effectController, 'showSkybox').name('Show Background').onChange(() => {
+    if (effectController.showSkybox) {
+      // Restore the skybox
+      scene.background = textureCube;
+    } else {
+      // Remove the skybox (set to solid color or null)
+      scene.background = null; // Or use a color: new THREE.Color(0x000000)
+    }
+  });
+  environmentFolder.open(); // Open this folder by default
+
+  const pointCloudFolder = gui.addFolder('Point Cloud');
+  pointCloudFolder.add(effectController, 'showPointCloud').name('Show Point Cloud').onChange((visible: boolean) => {
+    if (plane1) {
+      plane1.visible = visible;
+    }
+  });
+  pointCloudFolder.add(effectController, 'cellSize', 1.0, 20.0).name('Cell Size').onChange((value: number) => {
+    // Update the uniform for both planes
+    if (plane1) {
+      (plane1.material as THREE.ShaderMaterial).uniforms.u_cellSize.value = value;
+    }
+  });
+
+  pointCloudFolder.add(effectController, 'pointSize', 0.5, 10.0).name('Point Size').onChange((value: number) => {
+    // Update the uniform for both planes
+    if (plane1) {
+      (plane1.material as THREE.ShaderMaterial).uniforms.u_pointSize.value = value;
+    }
+  });
+  pointCloudFolder.open();
+
+  const planeFolder = gui.addFolder('Plane');
+  planeFolder.add(effectController, 'showPlane').name('Show Regular Plane').onChange((visible: boolean) => {
+    if (plane2) {
+      plane2.visible = visible;
+    }
+  });
+  planeFolder.open(); // Open this folder by default
 
   // Add balls
-  const sphereGeometry = new THREE.SphereGeometry(1, 20, 20);
+  // const sphereGeometry = new THREE.SphereGeometry(1, 20, 20);
 
-  for (let i = 0; i < 20; i++) {
-    const sphereMaterial = new THREE.MeshPhongMaterial({
-      color: Math.random() * 0xffffff,
-      shininess: 0.5,
-      specular: 0xffffff,
-      envMap: textureCube,
-    });
+  // for (let i = 0; i < 20; i++) {
+  //   const sphereMaterial = new THREE.MeshPhongMaterial({
+  //     color: Math.random() * 0xffffff,
+  //     shininess: 0.5,
+  //     specular: 0xffffff,
+  //     envMap: textureCube,
+  //   });
 
-    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    sphere.position.set(
-      (Math.random() - 0.5) * 200,
-      Math.random() * 50,
-      (Math.random() - 0.5) * 200
-    );
-    sphere.scale.multiplyScalar(10);
-    scene.add(sphere);
+  //   const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+  //   sphere.position.set(
+  //     (Math.random() - 0.5) * 200,
+  //     Math.random() * 50,
+  //     (Math.random() - 0.5) * 200
+  //   );
+  //   sphere.scale.multiplyScalar(10);
+  //   scene.add(sphere);
+  // }
+
+  //
+  // async function addGeneratedGeometry() {
+  //   const points = await createAIImagesPoints(); 
+  //   points.scale.set(50, 50, 2); 
+  //   points.scale.multiplyScalar(10);
+  //   scene.add(points);
+  // }
+  
+  // addGeneratedGeometry();
+
+  let plane1: THREE.Mesh | null = null;
+  let plane2: THREE.Mesh | null = null;
+
+  async function addGeneratedPlaneFake() {
+    plane1 = await createAIImagesPlaneFakePoints();
+    plane1.scale.set(25, 25, 1.8); 
+    plane1.position.set(0, 0, 0); 
+    
+    plane1.scale.multiplyScalar(10);
+    scene.add(plane1);
+
+    effectController.cellSize = (plane1.material as THREE.ShaderMaterial).uniforms.u_cellSize.value;
+    effectController.pointSize = (plane1.material as THREE.ShaderMaterial).uniforms.u_pointSize.value;  
   }
+  
+  addGeneratedPlaneFake();
+
+  async function addGeneratedPlane() {
+    plane2 = await createAIImagesPlane();
+    plane2.scale.set(25, 25, 2); 
+    plane2.position.set(0, 0, -10); 
+    
+    plane2.scale.multiplyScalar(10);
+    scene.add(plane2); 
+  }
+  
+  addGeneratedPlane();
 
   const target = new THREE.Vector3(0, 20, -50);
 
   const mouse = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
 
-  container.style.touchAction = 'none';
-  container.addEventListener('pointermove', (event) => {
-    if (!postprocessing.enabled) return;
+  // container.style.touchAction = 'none';
+  // container.addEventListener('pointermove', (event) => {
+  //   if (!postprocessing.enabled) return;
   
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  //   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  //   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   
-    raycaster.setFromCamera(mouse, camera);
+  //   raycaster.setFromCamera(mouse, camera);
   
-    const intersects = raycaster.intersectObjects(scene.children, true);
+  //   const intersects = raycaster.intersectObjects(scene.children, true);
   
-    if (intersects.length > 0) {
-      console.log('Intersected object:', intersects[0].object);
-      const distance = intersects[0].distance;
-      postprocessing.bokeh_uniforms['focalDepth'].value = distance;
-    } else {
-      console.log('No intersection');
-    }
-  });
+  //   if (intersects.length > 0) {
+  //     // console.log('Intersected object:', intersects[0].object);
+  //     const distance = intersects[0].distance;
+  //     postprocessing.bokeh_uniforms['focalDepth'].value = distance;
+  //   } else {
+  //     // console.log('No intersection');
+  //   }
+  // });
 
   function animateCamera() {
     const time = Date.now() * 0.00015;
@@ -239,6 +325,8 @@ export function initScene() {
       renderer.clear();
       renderer.render(scene, camera);
       scene.overrideMaterial = null;
+
+      renderer.setClearColor(0x000000, 0);
   
       // Render postprocessing
       renderer.setRenderTarget(null);
