@@ -64,6 +64,53 @@ export async function createAIImagesPlaneFakePoints(): Promise<THREE.Mesh> {
   return new THREE.Mesh(geometry, shaderMaterial);
 }
 
+export async function createAIImagesPlaneWithTextures(textures: THREE.Texture[]): Promise<THREE.Mesh> {
+  // Generate geometry using the modified function
+  const geometry = geometryUtils.getAIImagesBufferGeometryForPlane(
+    new geometryUtils.ScenarioDataWrapper(await textureToImageData(textures)),
+    {}, // imgCenterPoints (not used for the plane)
+    'ai_images'
+  );
+
+  // Create shader material
+  const shaderMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      u_texture: { value: textures[0] }, // Use the first texture for color
+    },
+    vertexShader: VERTEX_SHADER,
+    fragmentShader: FRAGMENT_SHADER,
+    side: THREE.DoubleSide,
+  });
+
+  // Return the THREE.Mesh object with the generated geometry
+  return new THREE.Mesh(geometry, shaderMaterial);
+}
+
+export async function createAIImagesPlaneFakePointsWithTextures(textures: THREE.Texture[]): Promise<THREE.Mesh> {
+  // Generate geometry using the modified function
+  const geometry = geometryUtils.getAIImagesBufferGeometryForPlane(
+    new geometryUtils.ScenarioDataWrapper(await textureToImageData(textures)),
+    {}, // imgCenterPoints (not used for the plane)
+    'ai_images'
+  );
+
+  // Create shader material
+  const shaderMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      u_texture: { value: textures[0] }, // Use the first texture for color
+      u_resolution: { value: 4096.0 },
+      u_cellSize: { value: 5.0 },
+      u_pointSize: { value: 1.0 },
+    },
+    vertexShader: VERTEX_SHADER2,
+    fragmentShader: FRAGMENT_SHADER2,
+    side: THREE.DoubleSide,
+  });
+
+  // Return the THREE.Mesh object with the generated geometry
+  return new THREE.Mesh(geometry, shaderMaterial);
+}
+
 
 export async function createAIImagesPoints(): Promise<THREE.Points> {
   const api = new Api();

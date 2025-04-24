@@ -3,7 +3,12 @@ import { GUI } from 'lil-gui';
 import Stats from 'stats.js';
 import { BokehShader, BokehDepthShader } from 'three/examples/jsm/shaders/BokehShader2.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { createAIImagesPoints, createAIImagesPlane, createAIImagesPlaneFakePoints } from './geometryHelper'; // Update with the correct path
+import { 
+  createAIImagesPoints, 
+  createAIImagesPlane, createAIImagesPlaneFakePoints, 
+  createAIImagesPlaneFakePointsWithTextures, 
+  createAIImagesPlaneWithTextures
+ } from './geometryHelper'; // Update with the correct path
 
 export function initScene() {
   const container = document.getElementById('app');
@@ -361,6 +366,71 @@ export function initScene() {
   
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
+
+  function handleFileUpload(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+  
+    const file = input.files[0];
+  
+    // Validate file type
+    if (!file.type.match('image/jpeg')) {
+      alert('Only JPG or JPEG files are allowed.');
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append('image', file);
+  
+    // Send the file to the server
+    fetch('http://localhost:8080/upload', {
+      method: 'POST',
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then(async (data) => {
+        console.log('File uploaded:', data);
+  
+        // Recreate the planes with the uploaded image and depth map
+        await recreatePlanes(data.originalImage, data.depthMap);
+      })
+      .catch((error) => {
+        console.error('Error uploading file:', error);
+      });
+  }
+  
+  // Attach the event listener to the upload button
+  const uploadInput = document.getElementById('uploadImage') as HTMLInputElement;
+  uploadInput.addEventListener('change', handleFileUpload);
+
+  async function recreatePlanes(originalImagePath: string, depthMapPath: string) {
+    const textureLoader = new THREE.TextureLoader();
+    const colorTexture = await textureLoader.loadAsync(originalImagePath);
+    const depthTexture = await textureLoader.loadAsync(depthMapPath);
+  
+    // Use the original image as the color texture and the depth map as the second texture
+    const textures = [colorTexture, depthTexture];
+  
+    // Recreate the fake point cloud plane
+    if (plane1) {
+      scene.remove(plane1); // Remove the old plane
+    }
+    plane1 = await createAIImagesPlaneFakePointsWithTextures(textures);
+    plane1.scale.set(25, 25, 1.8);
+    plane1.position.set(0, 0, 0);
+    plane1.scale.multiplyScalar(10);
+    scene.add(plane1);
+  
+    // Recreate the regular plane
+    if (plane2) {
+      scene.remove(plane2); // Remove the old plane
+    }
+    plane2 = await createAIImagesPlaneWithTextures(textures);
+    plane2.scale.set(25, 25, 2);
+    plane2.position.set(0, 0, -10);
+    plane2.scale.multiplyScalar(10);
+    scene.add(plane2);
+  }
 }
 
 
