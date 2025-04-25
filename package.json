@@ -16,11 +16,13 @@
     "vite": "^6.3.2"
   },
   "dependencies": {
+    "basic-ftp": "^5.0.5",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "lil-gui": "^0.20.0",
     "multer": "^1.4.5-lts.2",
     "pako": "^2.1.0",
+    "sharp": "^0.34.1",
     "stats.js": "^0.17.0",
     "three": "^0.176.0"
   }

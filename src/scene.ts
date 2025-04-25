@@ -393,6 +393,23 @@ export function initScene() {
   
         // Recreate the planes with the uploaded image and depth map
         await recreatePlanes(data.originalImage, data.depthMap);
+        
+        // Update the skybox if skyboxPath is provided
+        if (data.skyboxPath) {
+          const skyboxUrls = [
+            data.skyboxPath + 'posx.jpg', 
+            data.skyboxPath + 'negx.jpg',
+            data.skyboxPath + 'posy.jpg', 
+            data.skyboxPath + 'negy.jpg',
+            data.skyboxPath + 'posz.jpg', 
+            data.skyboxPath + 'negz.jpg'
+          ];
+          
+          const newTextureCube = new THREE.CubeTextureLoader().load(skyboxUrls);
+          scene.background = newTextureCube;
+          
+          console.log('Skybox updated with depth map:', data.skyboxPath);
+        }
       })
       .catch((error) => {
         console.error('Error uploading file:', error);
@@ -431,6 +448,51 @@ export function initScene() {
     plane2.scale.multiplyScalar(10);
     scene.add(plane2);
   }
+
+  const screenshotButton = document.getElementById('screenshotButton') as HTMLButtonElement;
+
+  screenshotButton.addEventListener('click', () => {
+    // Disable the button and add a "cooldown" class
+    screenshotButton.disabled = true;
+    screenshotButton.classList.add('cooldown');
+  
+    // Start the 10-second timer
+    setTimeout(() => {
+      screenshotButton.disabled = false;
+      screenshotButton.classList.remove('cooldown');
+    }, 10000); // 10 seconds
+  
+    const canvas = renderer.domElement;
+  
+    if (postprocessing.enabled) {
+      renderer.setRenderTarget(null); // Render to the screen
+      renderer.render(postprocessing.scene, postprocessing.camera);
+    } else {
+      renderer.render(scene, camera);
+    }
+  
+    // Convert canvas to a Base64-encoded JPG
+    const imageData = canvas.toDataURL('image/jpeg', 0.8); // 0.8 for quality
+  
+    // Send the image data to the server
+    fetch('http://localhost:8080/save-screenshot', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ image: imageData }),
+    })
+      .then((response) => {
+        if (response.ok) {
+          console.log('Screenshot saved successfully!');
+        } else {
+          console.error('Failed to save screenshot.');
+        }
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+      });
+  });
 }
 
 
