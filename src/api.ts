@@ -311,16 +311,16 @@ export class Api {
         const result = await this.makePromise(folder, imageUrls, useLocalBundle);
         
         // Add debug info to DOM
-        const debugDiv = document.createElement('div');
-        debugDiv.style.position = 'fixed';
-        debugDiv.style.top = '10px';
-        debugDiv.style.left = '10px';
-        debugDiv.style.backgroundColor = 'rgba(0,0,0,0.7)';
-        debugDiv.style.color = 'white';
-        debugDiv.style.padding = '10px';
-        debugDiv.style.zIndex = '9999';
-        debugDiv.innerHTML = `Type: ${ASSET_TYPE[type]}<br>Steps: ${steps}<br>Images requested: ${imageUrls.length}<br>Images loaded: ${result.length}`;
-        document.body.appendChild(debugDiv);
+        // const debugDiv = document.createElement('div');
+        // debugDiv.style.position = 'fixed';
+        // debugDiv.style.top = '10px';
+        // debugDiv.style.left = '10px';
+        // debugDiv.style.backgroundColor = 'rgba(0,0,0,0.7)';
+        // debugDiv.style.color = 'white';
+        // debugDiv.style.padding = '10px';
+        // debugDiv.style.zIndex = '9999';
+        // debugDiv.innerHTML = `Type: ${ASSET_TYPE[type]}<br>Steps: ${steps}<br>Images requested: ${imageUrls.length}<br>Images loaded: ${result.length}`;
+        // document.body.appendChild(debugDiv);
         
         return result;
     }

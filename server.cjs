@@ -391,6 +391,67 @@ app.post('/save-screenshot', async (req, res) => {
   });
 });
 
+// Add this endpoint to list previous uploads
+app.get('/previous-uploads', (req, res) => {
+  const uploadsDir = path.join(__dirname, 'public/uploads');
+  
+  try {
+    // Read all directories in the uploads folder
+    const dirs = fs.readdirSync(uploadsDir, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+    
+    // For each directory, check if it has a valid image and depth map
+    const validUploads = dirs.filter(dir => {
+      // Check if directory contains at least one jpg or jpeg file
+      const files = fs.readdirSync(path.join(uploadsDir, dir));
+      const hasImage = files.some(file => file.endsWith('.jpg') || file.endsWith('.jpeg'));
+      
+      // Check if depth folder exists and contains a depth map
+      const depthDir = path.join(uploadsDir, dir, 'depth');
+      let hasDepth = false;
+      
+      if (fs.existsSync(depthDir)) {
+        const depthFiles = fs.readdirSync(depthDir);
+        hasDepth = depthFiles.some(file => file.endsWith('.png'));
+      }
+      
+      return hasImage && hasDepth;
+    });
+    
+    // For each valid upload, get the image and depth map paths
+    const uploads = validUploads.map(dir => {
+      // Find the first jpg/jpeg file in the directory
+      const files = fs.readdirSync(path.join(uploadsDir, dir));
+      const imageName = files.find(file => file.endsWith('.jpg') || file.endsWith('.jpeg'));
+      
+      // Find the depth map
+      const depthDir = path.join(uploadsDir, dir, 'depth');
+      const depthFiles = fs.readdirSync(depthDir);
+      const depthName = depthFiles.find(file => file.endsWith('.png'));
+      
+      // Check if a skybox was created
+      const skyboxDir = path.join(__dirname, 'public/textures/cube', `${dir}-skybox`);
+      const hasSkybox = fs.existsSync(skyboxDir);
+      
+      return {
+        name: dir,
+        originalImage: `/uploads/${dir}/${imageName}`,
+        depthMap: `/uploads/${dir}/depth/${depthName}`,
+        skyboxPath: hasSkybox ? `/textures/cube/${dir}-skybox/` : null
+      };
+    });
+    
+    // Sort by date, newest first
+    uploads.sort((a, b) => b.name.localeCompare(a.name));
+    
+    res.json(uploads);
+  } catch (err) {
+    console.error('Error listing previous uploads:', err);
+    res.status(500).json({ error: 'Failed to list previous uploads' });
+  }
+});
+
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);

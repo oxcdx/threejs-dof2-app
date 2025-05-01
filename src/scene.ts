@@ -17,6 +17,15 @@ export function initScene() {
     return;
   }
 
+  // Add variables to store previous images data
+  let previousUploads: Array<{
+    name: string;
+    originalImage: string;
+    depthMap: string;
+    skyboxPath: string | null;
+  }> = [];
+  let currentUploadIndex = -1;
+
   // Scene, Camera, Renderer
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 3000);
@@ -378,6 +387,11 @@ export function initScene() {
       alert('Only JPG or JPEG files are allowed.');
       return;
     }
+
+    const appContainer = document.getElementById('app');
+    if (appContainer) {
+      appContainer.classList.add('cooldown');
+    }
   
     const formData = new FormData();
     formData.append('image', file);
@@ -408,7 +422,11 @@ export function initScene() {
           const newTextureCube = new THREE.CubeTextureLoader().load(skyboxUrls);
           scene.background = newTextureCube;
           
-          console.log('Skybox updated with depth map:', data.skyboxPath);
+          // console.log('Skybox updated with depth map:', data.skyboxPath);
+
+          if (appContainer) {
+            appContainer.classList.remove('cooldown');
+          }
         }
       })
       .catch((error) => {
@@ -452,14 +470,23 @@ export function initScene() {
   const screenshotButton = document.getElementById('screenshotButton') as HTMLButtonElement;
 
   screenshotButton.addEventListener('click', () => {
+    const appContainer = document.getElementById('app');
     // Disable the button and add a "cooldown" class
     screenshotButton.disabled = true;
     screenshotButton.classList.add('cooldown');
+
+    if (appContainer) {
+      appContainer.classList.add('cooldown');
+    }
   
     // Start the 10-second timer
     setTimeout(() => {
       screenshotButton.disabled = false;
       screenshotButton.classList.remove('cooldown');
+      
+      if (appContainer) {
+        appContainer.classList.remove('cooldown');
+      }
     }, 10000); // 10 seconds
   
     const canvas = renderer.domElement;
@@ -484,13 +511,141 @@ export function initScene() {
     })
       .then((response) => {
         if (response.ok) {
-          console.log('Screenshot saved successfully!');
+          // console.log('Screenshot saved successfully!');
         } else {
           console.error('Failed to save screenshot.');
         }
       })
       .catch((error) => {
         console.error('Error:', error);
+      });
+  });
+
+  // Add click handler for previous image button
+  const previousImagesSelect = document.getElementById('previousImagesSelect') as HTMLSelectElement;
+
+  // Function to load previous uploads
+  function loadPreviousUploads() {
+    const appContainer = document.getElementById('app');
+    if (appContainer) {
+      appContainer.classList.add('cooldown');
+    }
+    
+    // Disable select while loading
+    previousImagesSelect.disabled = true;
+    
+    fetch('http://localhost:8080/previous-uploads')
+      .then(response => response.json())
+      .then(data => {
+        previousUploads = data;
+        
+        // Clear existing options
+        previousImagesSelect.innerHTML = '<option value="" disabled selected>Select Previous Image</option>';
+        
+        // Add an option for each upload
+        previousUploads.forEach((upload, index) => {
+          const option = document.createElement('option');
+          option.value = index.toString();
+          
+          // Format date from filename (assuming ISO format)
+          let displayName = upload.name;
+          try {
+            // Extract date part and format it nicely
+            const datePart = upload.name.split('T')[0];
+            const date = new Date(datePart);
+            const formattedDate = date.toLocaleDateString();
+            const timePart = upload.name.split('T')[1].replace(/-/g, ':').substring(0, 8);
+            displayName = `${formattedDate} ${timePart}`;
+          } catch (e) {
+            console.log('Could not parse date from filename');
+          }
+          
+          option.textContent = displayName;
+          previousImagesSelect.appendChild(option);
+        });
+        
+        // Enable select after loading
+        previousImagesSelect.disabled = false;
+        
+        if (appContainer) {
+          appContainer.classList.remove('cooldown');
+        }
+        
+        console.log(`Loaded ${previousUploads.length} previous uploads`);
+      })
+      .catch(error => {
+        console.error('Error loading previous uploads:', error);
+        previousImagesSelect.disabled = false;
+        
+        if (appContainer) {
+          appContainer.classList.remove('cooldown');
+        }
+      });
+  }
+
+  // Load previous uploads when the page loads
+  loadPreviousUploads();
+
+
+  previousImagesSelect.addEventListener('change', () => {
+    const selectedIndex = parseInt(previousImagesSelect.value);
+    if (isNaN(selectedIndex)) return;
+    
+    // Show waiting cursor
+    const appContainer = document.getElementById('app');
+    if (appContainer) {
+      appContainer.classList.add('cooldown');
+    }
+    
+    const selected = previousUploads[selectedIndex];
+    console.log(`Loading selected upload: ${selected.name}`);
+    console.log(`Skybox path available: ${selected.skyboxPath ? 'Yes' : 'No'}`);
+    
+    // Load the image and depth map
+    recreatePlanes(selected.originalImage, selected.depthMap)
+      .then(() => {
+        // Update skybox if available
+        if (selected.skyboxPath) {
+          const skyboxUrls = [
+            selected.skyboxPath + 'posx.jpg', 
+            selected.skyboxPath + 'negx.jpg',
+            selected.skyboxPath + 'posy.jpg', 
+            selected.skyboxPath + 'negy.jpg',
+            selected.skyboxPath + 'posz.jpg', 
+            selected.skyboxPath + 'negz.jpg'
+          ];
+          
+          // console.log('Loading skybox with URLs:', skyboxUrls);
+          
+          // Force the skybox to be shown in the effectController
+          effectController.showSkybox = true;
+          
+          // Use a promise to ensure the texture loads
+          new THREE.CubeTextureLoader().loadAsync(skyboxUrls)
+            .then(newTextureCube => {
+              scene.background = newTextureCube;
+              // console.log('Skybox successfully updated');
+            })
+            .catch(error => {
+              console.error('Error loading skybox textures:', error);
+              // Fallback to default skybox
+              scene.background = textureCube;
+            });
+        } else {
+          console.log('No skybox path available for this image');
+          // Optional: set back to default skybox
+          scene.background = textureCube;
+        }
+        
+        if (appContainer) {
+          appContainer.classList.remove('cooldown');
+        }
+      })
+      .catch(error => {
+        console.error('Error loading previous image:', error);
+        if (appContainer) {
+          appContainer.classList.remove('cooldown');
+        }
       });
   });
 }
